@@ -22,7 +22,8 @@ export function createSmsRouter({ env = process.env, send = fetch } = {}) {
       return res.status(400).json({ error: { message: "Invalid SMS request" } });
     const now = Date.now();
     for (const [id, time] of delivered) if (now - time > 600000) delivered.delete(id);
-    const id = createHash("sha256").update(req.headers["webhook-id"]).digest("hex");
+    // SMSGate accepts message IDs up to 36 characters; retain 128 bits for retry identity.
+    const id = createHash("sha256").update(req.headers["webhook-id"]).digest("hex").slice(0, 32);
     if (delivered.has(id)) return res.status(200).json({});
     try {
       if (!pending.has(id)) {
@@ -33,7 +34,10 @@ export function createSmsRouter({ env = process.env, send = fetch } = {}) {
             body: JSON.stringify({ id, phoneNumbers: [phone], textMessage: { text: `Your OmniView verification code is ${otp}. Do not share this code.` }, ...(env.SMS_GATE_DEVICE_ID ? { deviceId: env.SMS_GATE_DEVICE_ID } : {}), ttl: 300 }),
             signal: AbortSignal.timeout(3500),
           });
-          if (!response.ok) throw Error("Gateway rejected request");
+          if (!response.ok) {
+            console.error("SMS gateway rejected request", { status: response.status });
+            throw Error("Gateway rejected request");
+          }
           delivered.set(id, Date.now());
         })();
         pending.set(id, job);

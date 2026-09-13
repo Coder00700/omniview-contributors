@@ -26,6 +26,7 @@ test("SMS hook rejects unsigned requests, sends only signed codes and deduplicat
   assert.equal(sent.length, 1);
   assert.deepEqual(sent[0].phoneNumbers, ["+919999999999"]);
   assert.equal(sent[0].deviceId, "device");
+  assert.ok(sent[0].id.length <= 36, "Gateway message ID must meet its API limit");
 });
 test("SMS hook reports failed gateway delivery and allows retry", async t => {
   let attempts = 0;
