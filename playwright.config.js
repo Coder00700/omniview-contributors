@@ -3,7 +3,7 @@ export default defineConfig({
   testDir: "./tests/browser",
   timeout: 45000,
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: "http://localhost:5174",
     channel: "msedge",
     launchOptions: {
       args: [
@@ -16,9 +16,10 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "npm run dev -- --port 5173",
-    url: "http://localhost:5173",
-    reuseExistingServer: true,
+    command: "npm run dev -- --port 5174 --strictPort",
+    url: "http://localhost:5174",
+    env: { VITE_SUPABASE_URL: "", VITE_SUPABASE_ANON_KEY: "", VITE_TURNSTILE_SITE_KEY: "" },
+    reuseExistingServer: false,
   },
   workers: 1,
 });

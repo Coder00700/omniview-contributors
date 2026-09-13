@@ -6,3 +6,7 @@ dist/
 test-results/
 playwright-report/
 /PHONE_OTP_SETUP.txt
+*.jks
+*.keystore
+*.apk
+/SERVICE_CONFIGURATION.txt

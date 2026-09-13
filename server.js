@@ -1,11 +1,16 @@
 import { postgresStore } from "./postgres-store.js";
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
+import { createSmsRouter } from "./sms-hook.js";
 import { createClient } from "@supabase/supabase-js";
 import { createStorageRouter } from "./storage-routes.js";
 const app = express();
 app.disable("x-powered-by");
+const origins = new Set(["https://localhost", "http://localhost", "capacitor://localhost", "http://localhost:3001", "http://localhost:5173", "https://omniview-contributors.onrender.com"]);
+app.use(cors({ origin: (origin, done) => done(null, !origin || origins.has(origin)), allowedHeaders: ["Authorization", "Content-Type"], methods: ["GET", "POST", "OPTIONS"] }));
 app.get("/healthz", (_req, res) => res.json({ status: "ok" }));
+app.use("/api/hooks", createSmsRouter());
 app.use(express.json({ limit: "2mb" }));
 const auth =
   process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY

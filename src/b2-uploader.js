@@ -4,7 +4,8 @@ export async function storageRequest(client, path, body) {
     error,
   } = await client.auth.getSession();
   if (error || !session) throw Error("Please sign in again.");
-  const r = await fetch(`/api${path}`, {
+  const origin = globalThis.Capacitor?.isNativePlatform?.() ? "https://omniview-contributors.onrender.com" : "";
+  const r = await fetch(`${origin}/api${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers: {
       Authorization: `Bearer ${session.access_token}`,

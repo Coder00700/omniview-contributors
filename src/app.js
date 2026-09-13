@@ -1,4 +1,5 @@
 import "./style.css";
+import { native, authRedirect, openLogin, connectAuthLinks, startLocation, stopLocation, wakeBackend } from "./platform.js";
 import { uploadVideo, storageRequest } from "./b2-uploader.js";
 import {
   createIcons,
@@ -67,7 +68,7 @@ for (const key of Object.keys(localStorage))
   if (key.startsWith("vehicle:")) localStorage.removeItem(key);
 const client =
   env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY
-    ? createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+    ? createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, { auth: { flowType: native ? "pkce" : "implicit" } })
     : null;
 const app = document.querySelector("#app");
 let user = null,
@@ -244,11 +245,7 @@ function renderAuth() {
       return notice(
         "Connect authentication first. See SETUP.md in the app folder.",
       );
-    const { error } = await client.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: location.origin },
-    });
-    if (error) throw error;
+    await openLogin(client);
   });
   on("auth-form", "submit", async (e) => {
     e.preventDefault();
@@ -269,13 +266,17 @@ function renderAuth() {
       pendingPhone = value.replace(/\s/g, "");
       if (authMethod === "phone" && !/^\+[1-9]\d{7,14}$/.test(pendingPhone))
         throw Error("Enter a valid phone number including country code.");
+      if (authMethod === "phone") {
+        button.textContent = "Connecting to verification service…";
+        await wakeBackend();
+      }
       const { error } = await client.auth.signInWithOtp(
         authMethod === "email"
           ? {
               email: value,
               options: {
                 shouldCreateUser: authMode === "signup",
-                emailRedirectTo: location.origin,
+                emailRedirectTo: authRedirect,
                 captchaToken: captcha,
               },
             }
@@ -299,6 +300,7 @@ function renderAuth() {
       notice(error.message);
     } finally {
       button.disabled = false;
+      button.textContent = authMethod === "phone" ? "Send verification code" : "Email me a sign-in link";
       if (window.turnstile) window.turnstile.reset();
       captcha = "";
     }
@@ -438,30 +440,12 @@ async function enableCamera() {
     document.querySelector("#camera").srcObject = stream;
     document.querySelector("#camera-placeholder").hidden = true;
     await navigator.storage?.persist?.();
-    if (!navigator.geolocation)
-      throw Error("Location is not supported on this device.");
-    await new Promise((resolve, reject) =>
-      navigator.geolocation.getCurrentPosition(
-        (p) => {
-          receiveGPS(p);
-          resolve();
-        },
-        () =>
-          reject(
-            Error(
-              "Allow precise location to attach coordinates to your footage.",
-            ),
-          ),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-      ),
-    );
-    watch = navigator.geolocation.watchPosition(
+    watch = await startLocation(
       receiveGPS,
       () => {
         const el = document.querySelector("#gps-status");
         if (el) el.textContent = "GPS unavailable · location gap";
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
     );
     document.querySelector("#record-button").disabled = false;
     b.hidden = true;
@@ -691,7 +675,7 @@ async function release() {
   clearInterval(timer);
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
-  if (watch !== null) navigator.geolocation.clearWatch(watch);
+  if (watch !== null) await stopLocation(watch);
   watch = null;
   try {
     await wake?.release();
@@ -869,6 +853,7 @@ window.addEventListener("online", () =>
   notice("You’re back online. Open My footage to upload pending clips."),
 );
 if (client) {
+  await connectAuthLinks(client, notice);
   const {
     data: { session },
   } = await client.auth.getSession();

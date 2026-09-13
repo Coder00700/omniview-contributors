@@ -1,0 +1,6 @@
+{
+  "appId": "com.omniview.contributors",
+  "appName": "OmniView Contributors",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" }
+}
