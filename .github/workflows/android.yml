@@ -1,0 +1,38 @@
+name: Android APK
+on:
+  workflow_dispatch:
+  push:
+    paths: [".github/workflows/android.yml"]
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VITE_SUPABASE_URL: https://jxceplhoofpojyolcsjz.supabase.co
+      VITE_SUPABASE_ANON_KEY: sb_publishable_FG66JVN83Ilkhz_08kafPg_ITXyqnz0
+      VITE_PHONE_AUTH_ENABLED: "true"
+      BUILD_NUMBER: ${{ github.run_number }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: bash scripts/build-android.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: team-signing-backup
+          path: android/.signing/team.jks
+          retention-days: 1
+          include-hidden-files: true
+      - name: Publish Android team test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v0.1.${BUILD_NUMBER}-test" OmniView-Contributors.apk --prerelease --title "Android team test 0.1.${BUILD_NUMBER}" --notes-file ANDROID_RELEASE.md
