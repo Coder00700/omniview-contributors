@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: omniview-contributors
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci && npm run build
+    startCommand: npm run server
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: VITE_SUPABASE_URL
+        value: https://jxceplhoofpojyolcsjz.supabase.co
+      - key: SUPABASE_URL
+        value: https://jxceplhoofpojyolcsjz.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_PHONE_AUTH_ENABLED
+        value: false
+      - key: DATABASE_URL
+        sync: false
+      - key: B2_ENDPOINT
+        value: https://s3.eu-central-003.backblazeb2.com
+      - key: B2_REGION
+        value: eu-central-003
+      - key: B2_BUCKET
+        value: omniview-contributors-jxceplhoofpojyolcsjz
+      - key: B2_KEY_ID
+        sync: false
+      - key: B2_APPLICATION_KEY
+        sync: false
+      - key: OMNIVIEW_ADMIN_TOKEN
+        sync: false
