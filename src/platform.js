@@ -33,7 +33,7 @@ export async function startLocation(receive, failed) {
   if (native) {
     await Geolocation.requestPermissions();
     receive(await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }));
-    return Geolocation.watchPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0, minimumUpdateInterval: 1000 }, (p, error) => p ? receive(p) : failed(error));
+    return Geolocation.watchPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0, interval: 1000, minimumUpdateInterval: 1000 }, (p, error) => p ? receive(p) : failed(error));
   }
   if (!navigator.geolocation) throw Error("Location is not supported on this device.");
   await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(p => { receive(p); resolve(); }, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }));

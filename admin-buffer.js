@@ -113,7 +113,7 @@ export function adminBuffer({ admin, s3, env, sign }) {
                 metadata: c.metadata,
                 url: await sign(
                   s3,
-                  new GetObjectCommand({ ...object(c), VersionId: version }),
+                  new GetObjectCommand({ ...object(c), VersionId: version, ResponseContentDisposition: `attachment; filename="${c.id}.${c.metadata?.mime?.includes("mp4") ? "mp4" : "webm"}"` }),
                   { expiresIn: 3600 },
                 ),
               };

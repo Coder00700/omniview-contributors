@@ -1,3 +1,4 @@
+import { locationQuality } from "./src/recording-quality.js";
 import { adminBuffer } from "./admin-buffer.js";
 import { Router } from "express";
 import {
@@ -62,7 +63,7 @@ export function validateClip(c) {
         accuracy,
         heading,
         speed,
-        relativeMs,
+        relativeMs: timestamp - c.created,
       }),
     ),
     timing: String(c.timing || "Approximate browser alignment").slice(0, 300),
@@ -218,7 +219,7 @@ export function createStorageRouter({
       object_path: r.object_path,
       storage_provider: "b2",
       b2_version_id: stored.VersionId,
-      metadata: { gps: c.gps, timing: c.timing, mime: c.mime },
+      metadata: { gps: c.gps, timing: c.timing, mime: c.mime, quality: locationQuality(c.gps, c.duration) },
     });
     if (error) throw error;
     await admin
@@ -245,7 +246,7 @@ export function createStorageRouter({
           error: "This clip no longer matches the saved upload session.",
         });
       if (!r || !r.upload_id) {
-        const key = `${req.userId}/${clip.id}/video`;
+        const key = `${req.userId}/${clip.id}/video.${clip.mime.includes("mp4") ? "mp4" : "webm"}`;
         const { data: reservation, error: reservationError } = await admin.rpc(
           "reserve_buffer_clip",
           { p_id: clip.id, p_user: req.userId, p_path: key, p_clip: clip },

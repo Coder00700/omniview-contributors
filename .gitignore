@@ -10,3 +10,4 @@ playwright-report/
 *.keystore
 *.apk
 /SERVICE_CONFIGURATION.txt
+/inspection/

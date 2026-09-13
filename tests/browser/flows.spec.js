@@ -129,7 +129,7 @@ test("three minute cap stops recording and offers another clip", async ({
     path: "test-results/recorder-desktop.png",
     fullPage: true,
   });
-  await page.clock.fastForward(181000);
+  await page.clock.runFor(181000);
   await expect(
     page.getByRole("heading", { name: "Your clip is saved." }),
   ).toBeVisible();
@@ -169,3 +169,4 @@ test("mobile dashboard fits viewport and recording opens immediately", async ({
     page.getByRole("heading", { name: "A short clip. A step forward." }),
   ).toBeVisible();
 });
+

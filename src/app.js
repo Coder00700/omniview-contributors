@@ -1,3 +1,5 @@
+import { fixWebmDuration } from "@fix-webm-duration/fix";
+import { locationQuality } from "./recording-quality.js";
 import "./style.css";
 import { native, authRedirect, openLogin, connectAuthLinks, startLocation, stopLocation, wakeBackend } from "./platform.js";
 import { uploadVideo, storageRequest } from "./b2-uploader.js";
@@ -474,10 +476,10 @@ function receiveGPS(position) {
     speed: position.coords.speed,
   };
   lastGPS = p;
-  if (active)
+  if (active && active.captureStarted)
     gps.push({ ...p, relativeMs: position.timestamp - active.created });
   const el = document.querySelector("#gps-status");
-  if (el) el.textContent = `GPS ±${Math.round(p.accuracy)} m`;
+  if (el) el.textContent = `GPS ±${Math.round(p.accuracy)} m${p.accuracy > 20 ? " · weak location" : ""}`;
 }
 async function enableMotion() {
   if (typeof DeviceOrientationEvent === "undefined")
@@ -522,7 +524,8 @@ async function startRecording() {
     throw Error(
       "Storage is almost full. Upload or delete saved clips before recording.",
     );
-  const mime = ["video/webm;codecs=vp8", "video/webm", "video/mp4"].find((t) =>
+  if (matchMedia("(orientation: portrait)").matches) showHint("For road footage, hold the phone sideways and level before recording. Keep this orientation throughout the clip.");
+  const mime = ["video/mp4;codecs=avc1.42E01E", "video/mp4", "video/webm;codecs=vp8", "video/webm"].find((t) =>
     MediaRecorder.isTypeSupported(t),
   );
   if (!mime)
@@ -543,12 +546,9 @@ async function startRecording() {
     gps: [],
     chunks: 0,
     timing:
-      "Browser MediaRecorder timeline + geolocation measurement time; approximate alignment, not sensor-level frame synchronization",
+      "v2: recorder start-event epoch with monotonic duration; GPS measurement timestamps; approximate frame alignment, not hardware synchronization",
   };
-  gps =
-    lastGPS && Date.now() - lastGPS.timestamp < 15000
-      ? [{ ...lastGPS, relativeMs: lastGPS.timestamp - active.created }]
-      : [];
+  gps = [];
   started = performance.now();
   hintState = { badSince: null, lastHint: started - 60000 };
   try {
@@ -597,7 +597,8 @@ async function startRecording() {
       if (!current.bytes)
         throw Error("The camera did not produce any video frames.");
       current.status = "saved";
-      current.duration = Math.min((performance.now() - started) / 1000, limit);
+      current.duration = current.stoppedDuration ?? (performance.now() - started) / 1000;
+      current.quality = locationQuality(gps, current.duration);
       current.gps = [...gps];
       await db.putClip(current);
     } catch {
@@ -609,7 +610,7 @@ async function startRecording() {
     await release();
     await refresh();
     modal(
-      `<div class="success-mark">${icon("check")}</div><h2>${current.status === "saved" ? "Your clip is saved." : "Recording was interrupted."}</h2><p>${clock(current.duration)} · ${size(current.bytes)} · ${gps.length} location samples</p><p>${current.status === "saved" ? "Record another clip or head to your archive to review and upload." : "Some footage could not be saved. Review the recovered clip before uploading."}</p><button id="another" class="button primary">Record another clip</button><button id="to-archive" class="button secondary">Review footage</button>`,
+      `<div class="success-mark">${icon("check")}</div><h2>${current.status === "saved" ? "Your clip is saved." : "Recording was interrupted."}</h2><p>${clock(current.duration)} · ${size(current.bytes)} · ${gps.length} location samples</p><p>${current.quality?.usable ? "Location coverage passed basic checks; alignment remains approximate." : "Weak or incomplete location coverage. Footage is saved, but precise location labels need review."}</p><p>${current.status === "saved" ? "Record another clip or head to your archive to review and upload." : "Some footage could not be saved. Review the recovered clip before uploading."}</p><button id="another" class="button primary">Record another clip</button><button id="to-archive" class="button secondary">Review footage</button>`,
     );
     action("another", () => {
       closeModal();
@@ -619,6 +620,13 @@ async function startRecording() {
       closeModal();
       navigate("archive");
     });
+  };
+  recorder.onstart = () => {
+    started = performance.now();
+    current.created = Date.now();
+    current.captureStarted = true;
+    gps = lastGPS && Date.now() - lastGPS.timestamp <= 2000
+      ? [{ ...lastGPS, relativeMs: lastGPS.timestamp - current.created }] : [];
   };
   try {
     recorder.start(2000);
@@ -641,7 +649,10 @@ async function startRecording() {
   document.querySelector("#record-state").textContent =
     "● RECORDING · SAVING LOCALLY";
   timer = setInterval(() => {
+    if (!active?.captureStarted) return;
     const elapsed = (performance.now() - started) / 1000;
+    const gpsLabel = document.querySelector("#gps-status");
+    if (gpsLabel && (!lastGPS || Date.now() - lastGPS.timestamp > 3000)) gpsLabel.textContent = "GPS signal stale · location needs review";
     document.querySelector("#elapsed").textContent =
       `${clock(elapsed)} / ${clock(limit)}`;
     if (elapsed >= limit) stopRecording();
@@ -664,6 +675,7 @@ async function startRecording() {
 }
 function stopRecording(message) {
   if (recorder?.state === "recording") {
+    active.stoppedDuration = (performance.now() - started) / 1000;
     recorder.stop();
     clearInterval(timer);
     document.querySelector("#stop-button").disabled = true;
@@ -709,10 +721,7 @@ async function preview(id) {
   } else {
     const parts = await db.chunks(id);
     previewURL = URL.createObjectURL(
-      new Blob(
-        parts.map((p) => p.blob),
-        { type: c.mime },
-      ),
+      await playableBlob(parts, c),
     );
     url = previewURL;
   }
@@ -770,10 +779,7 @@ async function upload(ids, confirmed = false) {
       await db.putClip(c);
       const progress = document.querySelector("#upload-progress");
       if (progress) progress.textContent = `Uploading ${c.name}…`;
-      const blob = new Blob(
-        parts.map((p) => p.blob),
-        { type: c.mime },
-      );
+      const blob = await playableBlob(parts, c);
       await uploadVideo(client, c, blob, (percent) => {
         const el = document.querySelector("#upload-progress");
         if (el) el.textContent = `Uploading ${c.name} · ${percent}%`;
@@ -872,3 +878,13 @@ if (client) {
     }
   });
 } else render();
+
+async function playableBlob(parts, clip) {
+  const blob = new Blob(parts.map(p => p.blob), { type: clip.mime });
+  // Preserve the bytes of legacy uploads so interrupted multipart uploads resume.
+  return clip.mime.includes("webm") && clip.timing?.startsWith("v2:")
+    ? fixWebmDuration(blob, clip.duration * 1000, { logger: false }) : blob;
+}
+screen.orientation?.addEventListener("change", () => {
+  if (active?.captureStarted) stopRecording("Phone rotated. Clip saved; align the phone before starting another clip.");
+});
