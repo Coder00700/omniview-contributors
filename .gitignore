@@ -5,3 +5,4 @@ dist/
 .npm-cache/
 test-results/
 playwright-report/
+/PHONE_OTP_SETUP.txt
