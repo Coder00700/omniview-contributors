@@ -47,3 +47,18 @@ export async function wakeBackend() {
   const r = await fetch(`${apiOrigin}/healthz`, { signal: AbortSignal.timeout(90000) });
   if (!r.ok) throw Error("The server is starting. Please try again shortly.");
 }
+
+export async function checkAppUpdate() {
+  if (!native) return null;
+  const info = await App.getInfo();
+  const r = await fetch(`${apiOrigin}/api/app-update`, {signal:AbortSignal.timeout(60000)});
+  if (!r.ok) throw Error("Could not check for updates. Please try again later.");
+  const latest = await r.json();
+  return latest.build > Number(info.build) ? latest : null;
+}
+export async function downloadAppUpdate(url) {
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.backblazeb2.com')) throw Error('Invalid update download');
+  await Browser.open({url});
+}
+

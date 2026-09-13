@@ -1,3 +1,4 @@
+import { appUpdates } from "./app-updates.js";
 import { postgresStore } from "./postgres-store.js";
 import "dotenv/config";
 import express from "express";
@@ -11,6 +12,7 @@ const origins = new Set(["https://localhost", "http://localhost", "capacitor://l
 app.use(cors({ origin: (origin, done) => done(null, !origin || origins.has(origin)), allowedHeaders: ["Authorization", "Content-Type"], methods: ["GET", "POST", "OPTIONS"] }));
 app.get("/healthz", (_req, res) => res.json({ status: "ok" }));
 app.use("/api/hooks", createSmsRouter());
+app.use("/api", appUpdates());
 app.use(express.json({ limit: "2mb" }));
 const auth =
   process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY

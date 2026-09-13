@@ -170,3 +170,21 @@ test("mobile dashboard fits viewport and recording opens immediately", async ({
   ).toBeVisible();
 });
 
+
+test('mobile profile edits name, saves preferences and logs out', async ({ page }) => {
+  await page.setViewportSize({ width:390, height:844 });
+  await page.goto('/');
+  await page.getByRole('button', {name:'Explore local preview'}).click();
+  await page.getByRole('button', {name:'Profile', exact:true}).click();
+  await expect(page.getByRole('heading', {name:'My profile.'})).toBeVisible();
+  await page.getByRole('button', {name:'Edit profile'}).click();
+  await page.getByLabel('Display name').fill('Road Contributor');
+  await page.getByRole('button', {name:'Save changes'}).click();
+  await expect(page.getByRole('heading', {name:'Road Contributor'})).toBeVisible();
+  await page.getByLabel('Default clip length').selectOption('300');
+  expect(await page.evaluate(()=>localStorage.getItem('default-clip-length'))).toBe('300');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:'test-results/profile-mobile.png',fullPage:true});
+  await page.getByRole('button', {name:'Leave preview'}).click();
+  await expect(page.getByRole('heading', {name:'Make your journey count.'})).toBeVisible();
+});

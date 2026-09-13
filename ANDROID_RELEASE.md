@@ -20,3 +20,12 @@ This is an initial team-test build. Automated web/API tests and the Android buil
 are checked; physical camera/GPS, OAuth app return, and the full phone OTP flow
 must also be tested on a real Android device. Save or upload pending footage before
 uninstalling: Android removes the app's local recordings when it is uninstalled.
+
+This update adds Profile (editable name, preferences, logout), one-second requested
+GPS updates with coverage screening, corrected recording-start timing, MP4
+preference/WebM duration repair, and filename extensions. Rotation ends the clip.
+
+Install this version once to enable automatic update checks. Later releases show
+Update now when opened, with a manual check in Profile. Android still requires
+opening the downloaded APK and approving installation. APK updates use the same
+signing key and preserve app data; do not uninstall to update.

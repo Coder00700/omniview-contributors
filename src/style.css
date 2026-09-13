@@ -1621,3 +1621,20 @@ dialog .button {
     scroll-behavior: auto !important;
   }
 }
+.account-card { display:flex; align-items:center; gap:22px; padding:28px; background:#fff; border:1px solid var(--border); border-radius:22px; margin-bottom:16px; }
+.account-card h2 { margin:8px 0; overflow-wrap:anywhere; }
+.account-card p { color:#66736d; margin:0 0 12px; overflow-wrap:anywhere; }
+.account-card > .button { margin-left:auto; }
+.account-avatar { display:grid; place-items:center; background:#eaf3dd; color:#365936; width:78px; height:78px; border-radius:50%; flex-shrink:0; }
+.account-avatar svg { width:46px; height:46px; }
+.account-badge { display:inline-block; background:#eff6e9; color:#365936; border-radius:20px; padding:5px 12px; font-size:12px; }
+.profile-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:0 0 24px; }
+.profile-stats > div { padding:20px 10px; text-align:center; border:1px solid var(--border); background:white; border-radius:16px; }
+.profile-stats strong,.profile-stats span { display:block; }
+.profile-stats strong { font-size:23px; margin-bottom:8px; }
+.profile-stats span { color:#66736d; font-size:12px; }
+.profile-setting { display:flex; align-items:center; gap:14px; width:100%; text-align:left; background:none; border:0; padding:15px 0; color:inherit; }
+.profile-setting span { flex:1; }
+.profile-setting small { display:block; color:#66736d; margin-top:5px; }
+.profile-logout { color:#a43232; border:1px solid #e8c8c8; background:#fff6f6; width:100%; }
+@media(max-width:760px) { .account-card { flex-wrap:wrap; gap:14px; padding:20px; } .account-card > div:nth-child(2) { flex:1; min-width:140px; } .account-card > .button { width:100%; margin:0; } }

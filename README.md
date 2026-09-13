@@ -58,3 +58,12 @@ Admin transfer and cleanup: see [BACKBLAZE.md](BACKBLAZE.md). Contributors go st
 Supabase's Send SMS hook calls `POST /api/hooks/sms`. Configure its signing secret and the gateway credentials as server-only environment variables. The hook verifies the raw request signature and forwards to the configured SMSGate device over HTTPS. Supabase controls OTP generation, expiry and verification. Gateway acceptance is not proof of handset delivery. Message-level encryption is currently off for the team test.
 
 The free Render backend may sleep; the app calls `/healthz` before requesting an SMS to wake it first. Enable `VITE_PHONE_AUTH_ENABLED=true` only after the Supabase Phone provider and Send SMS hook are configured. Set the Supabase allowed redirect `com.omniview.contributors://auth/callback` for Android OAuth/email return. Google sign-in opens the system browser rather than an embedded login page.
+
+
+Android update delivery: after a successful signed release, download its APK to
+OmniView-Contributors.apk and run `node scripts/publish-app-update.mjs BUILD_NUMBER`
+with the existing server-side B2 environment. This uploads an immutable version
+and then the latest manifest; never announce an unbuilt APK. `/api/app-update`
+returns only the current app release with a short-lived download URL. It cannot
+sign contributor video paths. APK release objects live under `app-updates/` and
+are separate from video cleanup. Retain only needed releases to limit storage.

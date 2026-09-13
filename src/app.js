@@ -1,3 +1,4 @@
+import { checkAppUpdate, downloadAppUpdate } from "./platform.js";
 import { fixWebmDuration } from "@fix-webm-duration/fix";
 import { locationQuality } from "./recording-quality.js";
 import "./style.css";
@@ -95,7 +96,7 @@ let user = null,
   wake = null;
 let lastGPS = null;
 let hintState = { badSince: null, lastHint: 0 },
-  limit = 180,
+  limit = localStorage.getItem("default-clip-length") === "300" ? 300 : 180,
   previewURL = null;
 const icon = (name) => `<i data-lucide="${name}" aria-hidden="true"></i>`;
 const escape = (s) =>
@@ -138,7 +139,7 @@ function render() {
     ["home", "layout-dashboard", "Overview"],
     ["record", "video", "Record a clip"],
     ["archive", "folder-open", "My footage"],
-    ["settings", "settings-2", "Preferences"],
+    ["settings", "circle-user-round", "Profile"],
   ]
     .map(
       ([key, i, text]) =>
@@ -146,16 +147,20 @@ function render() {
     )
     .join(
       "",
-    )}</nav><div class="sidebar-note">${icon("sprout")}<strong>Small clips.<br>Better roads.</strong><p>Your everyday journey can make a real difference.</p></div><button id="signout" class="profile">${icon("circle-user-round")}<span>${escape(isDemo() ? "Local preview" : user.email?.split("@")[0] || user.phone || "Contributor")}<small>${isDemo() ? "Not an authenticated account" : "Contributor account"}</small></span>${icon("log-out")}</button></aside><div class="workspace"><header><span>Community / <strong>${{ home: "Overview", record: "Record a clip", archive: "My footage", settings: "Preferences" }[page]}</strong></span><span class="connection"><b class="${navigator.onLine ? "" : "offline"}"></b>${navigator.onLine ? "Online" : "Offline · saved locally"}</span></header><main>${isDemo() ? '<div class="demo-banner">Local preview · recordings stay on this device. Sign in to a configured account to upload.</div>' : ""}${{ home: homeView, record: recordView, archive: archiveView, settings: settingsView }[page]()}</main><footer><span>OMNIVIEW COMMUNITY</span><span>Every road deserves a better tomorrow.</span></footer></div><dialog id="modal"></dialog>`;
+    )}</nav><div class="sidebar-note">${icon("sprout")}<strong>Small clips.<br>Better roads.</strong><p>Your everyday journey can make a real difference.</p></div><button id="open-profile" class="profile">${icon("circle-user-round")}<span>${escape(isDemo() ? "Local preview" : user.email?.split("@")[0] || user.phone || "Contributor")}<small>${isDemo() ? "Not an authenticated account" : "Contributor account"}</small></span>${icon("log-out")}</button></aside><div class="workspace"><header><span>Community / <strong>${{ home: "Overview", record: "Record a clip", archive: "My footage", settings: "Profile" }[page]}</strong></span><span class="connection"><b class="${navigator.onLine ? "" : "offline"}"></b>${navigator.onLine ? "Online" : "Offline · saved locally"}</span></header><main>${isDemo() ? '<div class="demo-banner">Local preview · recordings stay on this device. Sign in to a configured account to upload.</div>' : ""}${{ home: homeView, record: recordView, archive: archiveView, settings: settingsView }[page]()}</main><footer><span>OMNIVIEW COMMUNITY</span><span>Every road deserves a better tomorrow.</span></footer></div><dialog id="modal"></dialog>`;
   paint();
   document
     .querySelectorAll("[data-page]")
     .forEach((b) => (b.onclick = () => navigate(b.dataset.page)));
+  action("open-profile", () => navigate("settings"));
   action("signout", async () => {
     if (active || busy)
       return notice("Finish recording or uploading before signing out.");
     await release();
-    if (client && !isDemo()) await client.auth.signOut();
+    if (client && !isDemo()) {
+      const { error } = await client.auth.signOut({ scope: "local" });
+      if (error) throw error;
+    }
     user = null;
     selected.clear();
     render();
@@ -353,9 +358,32 @@ function settingsView() {
     (n, c) => n + (c.status === "uploaded" ? 0 : c.bytes || 0),
     0,
   );
-  return `<div class="heading"><div class="eyebrow">MADE TO FIT YOUR JOURNEY</div><h1>Your preferences.</h1><p>Simple controls for your device and your data.</p></div><section class="panel narrow"><h2>Device storage</h2><div class="storage-label"><strong>${size(used)} used</strong><span>${size(CAP)} app limit</span></div><progress value="${used}" max="${CAP}"></progress><p>Recording pauses at the limit. Unuploaded clips are never automatically overwritten.</p><button id="persist" class="button secondary">${icon("hard-drive")} Request persistent storage</button><p class="fine">Your browser decides whether persistent storage is allowed. It does not protect against manually clearing site data.</p><hr><h2>Upload preferences</h2><label class="check-label"><input id="wifi" type="checkbox" ${localStorage.getItem("wifi-only") !== "false" ? "checked" : ""}> Prefer Wi-Fi uploads</label><p class="fine">Where your browser cannot identify the connection, we’ll ask before uploading.</p><hr><h2>Privacy by default</h2><p>Camera and location are used only for recording. Microphone access is never requested. Private uploads are accessible to your account under the configured storage policies.</p></section>`;
+  return `<div class="heading"><div class="eyebrow">MADE TO FIT YOUR JOURNEY</div><h1>My profile<span class="green">.</span></h1><p>Your account, your contributions, your preferences.</p></div><section class="account-card"><div class="account-avatar">${icon("circle-user-round")}</div><div><span class="eyebrow">OMNIVIEW CONTRIBUTOR</span><h2>${escape(user.user_metadata?.display_name || user.user_metadata?.full_name || (isDemo() ? localStorage.getItem("demo-display-name") || "Local preview" : "Contributor"))}</h2><p>${escape(user.email || user.phone || "Explore without an account")}</p><span class="account-badge">${isDemo() ? "Preview mode" : "Signed in"}</span></div><button id="edit-profile" class="button secondary">Edit profile</button></section><section class="profile-stats"><div><strong>${clips.length}</strong><span>Clips recorded</span></div><div><strong>${clips.filter(c=>c.status === "uploaded").length}</strong><span>Uploaded</span></div><div><strong>${size(used)}</strong><span>On this device</span></div></section><section class="panel narrow"><h2>Account</h2><button id="check-update" class="profile-setting">${icon("smartphone")}<span>App updates<small>Check for the latest Android version</small></span>${icon("arrow-right")}</button><button id="profile-archive" class="profile-setting">${icon("folder-open")}<span>My footage<small>Review your saved contributions</small></span>${icon("arrow-right")}</button><hr><h2>Recording preferences</h2><label for="default-length">Default clip length</label><select id="default-length"><option value="180" ${localStorage.getItem("default-clip-length") !== "300" ? "selected" : ""}>3 minutes</option><option value="300" ${localStorage.getItem("default-clip-length") === "300" ? "selected" : ""}>5 minutes</option></select><hr><h2>Device storage</h2><div class="storage-label"><strong>${size(used)} used</strong><span>${size(CAP)} app limit</span></div><progress value="${used}" max="${CAP}"></progress><p>Recording pauses at the limit. Unuploaded clips are never automatically overwritten.</p><button id="persist" class="button secondary">${icon("hard-drive")} Request persistent storage</button><p class="fine">Your browser decides whether persistent storage is allowed. It does not protect against manually clearing site data.</p><hr><h2>Upload preferences</h2><label class="check-label"><input id="wifi" type="checkbox" ${localStorage.getItem("wifi-only") !== "false" ? "checked" : ""}> Prefer Wi-Fi uploads</label><p class="fine">Where your browser cannot identify the connection, we’ll ask before uploading.</p><hr><h2>Privacy by default</h2><p>Camera and location are used only for recording. Microphone access is never requested. Private uploads are accessible to your account and authorized OmniView administrators for processing.</p><hr><button id="signout" class="button profile-logout">${icon("log-out")} ${isDemo() ? "Leave preview" : "Log out"}</button><p class="fine">Saved clips stay on this device when you log out. Sign back in to access them.</p></section>`;
 }
 function bindPage() {
+  action("check-update", () => offerUpdate(true));
+  action("profile-archive", () => navigate("archive"));
+  on("default-length", "change", e => {
+    localStorage.setItem("default-clip-length", e.target.value);
+    limit = Number(e.target.value);
+    notice("Recording preference saved.");
+  });
+  action("edit-profile", () => {
+    const name = user.user_metadata?.display_name || user.user_metadata?.full_name || (isDemo() ? localStorage.getItem("demo-display-name") : "") || "";
+    modal(`<h2>Edit profile</h2><p>Choose the name shown in your profile.</p><label for="display-name">Display name</label><input id="display-name" maxlength="80" autocomplete="name" value="${escape(name)}"><button id="save-profile" class="button primary">Save changes</button><button id="cancel-profile" class="button secondary">Cancel</button>`);
+    action("cancel-profile", closeModal);
+    action("save-profile", async () => {
+      const display_name = document.querySelector("#display-name").value.trim();
+      if (!display_name) return notice("Please enter your name.");
+      if (isDemo()) localStorage.setItem("demo-display-name", display_name);
+      else {
+        const { data, error } = await client.auth.updateUser({ data: { display_name } });
+        if (error) throw error;
+        user = data.user;
+      }
+      closeModal(); render(); notice("Profile updated.");
+    });
+  });
   ["start-home", "first-clip", "archive-record", "empty-record"].forEach((id) =>
     action(id, () => navigate("record")),
   );
@@ -695,6 +723,10 @@ async function release() {
   wake = null;
 }
 function modal(html) {
+  if (!document.querySelector("#modal")) {
+    const dialog = document.createElement("dialog");
+    dialog.id = "modal"; app.appendChild(dialog);
+  }
   document.querySelector("#modal").innerHTML = html;
   document.querySelector("#modal").showModal();
   paint();
@@ -888,3 +920,26 @@ async function playableBlob(parts, clip) {
 screen.orientation?.addEventListener("change", () => {
   if (active?.captureStarted) stopRecording("Phone rotated. Clip saved; align the phone before starting another clip.");
 });
+
+let updateCheckRunning = false;
+async function offerUpdate(manual = false) {
+  if (!native) { if (manual) notice("Updates are available in the Android app."); return; }
+  if (active || busy || updateCheckRunning) return;
+  updateCheckRunning = true;
+  try {
+    const latest = await checkAppUpdate();
+    if (active || busy || document.querySelector("dialog[open]")) return;
+    if (!latest) { if (manual) notice("Your app is up to date."); return; }
+    if (!manual && sessionStorage.getItem("update-dismissed") === String(latest.build)) return;
+    modal(`<h2>An update is ready</h2><p>OmniView ${escape(latest.version)} is available. Download the update, then open it and confirm Install in Android. Your saved clips stay in the app.</p><button id="install-update" class="button primary">Update now</button><button id="later-update" class="button secondary">Later</button>`);
+    action("later-update", () => { sessionStorage.setItem("update-dismissed", String(latest.build)); closeModal(); });
+    action("install-update", async () => {
+      const fresh = await checkAppUpdate();
+      if (fresh) await downloadAppUpdate(fresh.url);
+      closeModal();
+    });
+  } catch (error) { if (manual) notice(error.message); }
+  finally { updateCheckRunning = false; }
+}
+setTimeout(() => offerUpdate(), 2500);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) offerUpdate(); });
